@@ -1,11 +1,11 @@
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 33
+    compileSdkVersion 34
 
     defaultConfig {
-        minSdkVersion 19
-        targetSdkVersion 33
+        minSdkVersion 21
+        targetSdkVersion 34
     }
     namespace 'plugin.admob'
 }
@@ -17,8 +17,8 @@ afterEvaluate {
 
 dependencies {
     implementation ':Corona@aar'
-    implementation 'com.google.android.gms:play-services-ads:22.6.0'
-    implementation 'com.google.android.ump:user-messaging-platform:2.2.0'
+    implementation 'com.google.android.gms:play-services-ads:23.2.0'
+    implementation 'com.google.android.ump:user-messaging-platform:3.0.0'
 }
 
 task exportAARToThePluginBinary {

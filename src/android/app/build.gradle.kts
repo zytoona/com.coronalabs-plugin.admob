@@ -186,7 +186,7 @@ android {
     }
     namespace = "plugin.admob"
 
-    compileSdkVersion(33 )
+    compileSdkVersion(34 )
     defaultConfig {
         applicationId = coronaAppPackage
         targetSdkVersion(33)
