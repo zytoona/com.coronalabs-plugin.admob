@@ -1,7 +1,7 @@
 buildscript {
     repositories {
         google()
-        jcenter()
+        mavenCentral()  // Maven Central repository
     }
     dependencies {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.21")
@@ -13,7 +13,8 @@ buildscript {
 allprojects {
     repositories {
         google()
-        jcenter()
+        mavenCentral()  // Maven Central repository
+
         // maven(url = "https:// some custom repo")
         val nativeDir = if (System.getProperty("os.name").toLowerCase().contains("windows")) {
             System.getenv("CORONA_ROOT")

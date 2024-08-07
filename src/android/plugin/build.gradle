@@ -4,8 +4,15 @@ android {
     compileSdkVersion 34
 
     defaultConfig {
-        minSdkVersion 21
+        minSdkVersion 23
         targetSdkVersion 34
+        versionCode 1
+        versionName "1.0"
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
     namespace 'plugin.admob'
 }
@@ -21,9 +28,9 @@ dependencies {
     implementation 'com.google.android.ump:user-messaging-platform:3.0.0'
 }
 
-task exportAARToThePluginBinary {
-    group 'Solar2Dev'
-    dependsOn assemble
+tasks.register("extractPluginJar") {
+    group "Solar2Dev"
+    dependsOn assembleRelease
     doLast {
         copy {
             from {
@@ -31,19 +38,44 @@ task exportAARToThePluginBinary {
                     include 'classes.jar'
                 }.singleFile
             }
-            into "../../../plugins/2020.3607/android/"
-            rename "classes.jar", "plugin.admob.jar"
+            into "$buildDir/outputs/"
+            String packageName = new XmlSlurper().parse(file('src/main/AndroidManifest.xml')).@package.text()
+            rename "classes.jar", "${packageName}.jar"
         }
     }
 }
 
-task createDataTgz(type: Tar) {
-    group 'Solar2Dev'
-    from "../../../plugins/2020.3607/android/"
-    destinationDirectory = file("$buildDir/outputs")
-    archiveFileName = 'data.tgz'
-    compression = Compression.GZIP
-    dependsOn exportAARToThePluginBinary
-}
+// This creates archive for plugin so it can be used by Simulator from build.settings
+// by deploying it directly to Solar2DPlugins directory. This is first in line location
+// to retrieve plugins, so will overshadow online directory/store downloads.
+def providerId = 'com.solar2d'
+tasks.register("deployToLocalSolar2DRepo", Tar) {
+    group "Solar2Dev"
 
-assemble.finalizedBy(createDataTgz)
+    dependsOn assembleRelease
+
+    File pluginManifestFile = file("src/main/AndroidManifest.xml")
+    String manifestContents = pluginManifestFile.text
+    def pluginManifestXml = new XmlSlurper().parseText(manifestContents)
+    String packageName = pluginManifestXml.@package.toString()
+
+    compression = Compression.GZIP
+    archiveFileName = "data.tgz"
+    def rootS2DP
+    if(System.env.APP_DATA) {
+        rootS2DP = System.env.APP_DATA
+    } else {
+        rootS2DP = System.env.HOME
+    }
+
+    def dst = file("$rootS2DP/Solar2DPlugins/$providerId/$packageName/android")
+    destinationDirectory = dst
+
+    into("/") {
+        from("$buildDir/outputs/aar")
+        include("${project.name}-release.aar")
+    }
+    doLast {
+        println("\n\n\n== !!! IMPORTANT !!! ==\nMake sure to delete plugin when done: $dst\nThis plugin will override any Solar2Directory plugin, or plugin from any other source")
+    }
+}
