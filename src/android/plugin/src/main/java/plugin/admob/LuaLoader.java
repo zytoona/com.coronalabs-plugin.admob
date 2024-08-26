@@ -1622,6 +1622,7 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
             }
 
             double height = 0;
+            double bottomOffset = 0;
 
             final CoronaActivity coronaActivity = CoronaEnvironment.getCoronaActivity();
             final String fAdUnitIdParam = adUnitIdParam;
@@ -1629,9 +1630,9 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
             try {
                 if (coronaActivity != null) {
                     // since we're returning a value to Lua, we need to implement a FutureTask
-                    FutureTask<Double> heightTask = new FutureTask<>(new Callable<Double>() {
+                    FutureTask<double[]> infoTask = new FutureTask<>(new Callable<double[]>() {
                         @Override
-                        public Double call() {
+                        public double[] call() {
                             String adUnitId;
                             if (fAdUnitIdParam != null) {
                                 adUnitId = fAdUnitIdParam;
@@ -1640,9 +1641,9 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
                             }
 
                             double result = 0.0;
-							    //BYME: 
+                            double offset = 0.0;
+                            //BYME:
                             boolean resultValid = false;
-
 
                             if (adUnitId == null) {
                                 logMsg(WARNING_MSG, "Banner not loaded");
@@ -1652,39 +1653,51 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
                                     AdSize size = banner.getAdSize();
                                     if (size != null) {
                                         result = size.getHeightInPixels(coronaActivity) / (double) admobObjects.get(Y_RATIO_KEY);
-										//BYME: moved this calculation to init from	banner load method
+                                        //BYME: moved this calculation to init from	banner load method
                                         resultValid = true;
-                                        Log.i(CORONA_TAG, "banner height, from loaded banner size:"+result);
+                                        Log.i(CORONA_TAG, "banner height, from loaded banner size:" + result);
+										//BYME:
+                                        // Calculate bottom offset
+                                        int[] location = new int[2];
+                                        banner.getLocationOnScreen(location);
+                                        int bannerBottom = location[1] + banner.getHeight();
+                                        int screenHeight = coronaActivity.getResources().getDisplayMetrics().heightPixels;
+                                        offset = (screenHeight - bannerBottom) / (double) admobObjects.get(Y_RATIO_KEY);
                                     }
                                 }
                             }
-                            if(!resultValid) {
+                            if (!resultValid) {
                                 result = getAdaptiveAdSize(coronaActivity).getHeightInPixels(coronaActivity) / (double) admobObjects.get(Y_RATIO_KEY);
-                                Log.i(CORONA_TAG,"banner height, from Api size:"+result);
+                                Log.i(CORONA_TAG, "banner height, from Api size:" + result);
+                                // Assume banner is at the bottom when using adaptive size
+                                offset = 0.0;
                             }
                             // return result to FutureTask
-                            return result;
+                            return new double[]{result, offset};
                         }
                     });
 
-                    coronaActivity.runOnUiThread(heightTask);
+                    coronaActivity.runOnUiThread(infoTask);
 
                     // IMPORTANT! must use get() so FutureTask will block until it returns a value
-                    height = heightTask.get(2000, TimeUnit.MILLISECONDS);
+                    double[] results = infoTask.get(2000, TimeUnit.MILLISECONDS);
+                    height = results[0];
+                    bottomOffset = results[1];
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
-		      //BYME: 
+                //BYME:
                 height = getAdaptiveAdSize(coronaActivity).getHeightInPixels(coronaActivity) / (double) admobObjects.get(Y_RATIO_KEY);
-                Log.i(CORONA_TAG,"had exception get API size:" + height);
+                bottomOffset = 0.0;
+                Log.i(CORONA_TAG, "had exception get API size:" + height);
             }
 
             luaState.pushNumber(height);
+            luaState.pushNumber(bottomOffset);
 
-            return 1;
+            return 2;
         }
     }
-
     // [Lua] updateConsentForm( [options] )
     private class UpdateConsentForm implements NamedJavaFunction {
         /**
