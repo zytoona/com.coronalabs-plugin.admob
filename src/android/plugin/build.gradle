@@ -1,11 +1,10 @@
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 34
-
+    compileSdk 34
     defaultConfig {
-        minSdkVersion 23
-        targetSdkVersion 34
+        namespace = "plugin.admob"
+        minSdkVersion 21
         versionCode 1
         versionName "1.0"
     }
@@ -24,22 +23,26 @@ afterEvaluate {
 
 dependencies {
     implementation ':Corona@aar'
-    implementation 'com.google.android.gms:play-services-ads:23.2.0'
-    implementation 'com.google.android.ump:user-messaging-platform:3.0.0'
+    implementation 'com.google.android.gms:play-services-ads:23.5.0'
+    implementation 'com.google.android.ump:user-messaging-platform:3.1.0'
+    implementation 'androidx.fragment:fragment:1.8.5'
 }
 
+def buildDirectory = getLayout().getBuildDirectory().asFile.get()
 tasks.register("extractPluginJar") {
     group "Solar2Dev"
     dependsOn assembleRelease
     doLast {
         copy {
             from {
-                zipTree("$buildDir/outputs/aar/${project.name}-release.aar").matching {
+                zipTree("$buildDirectory/outputs/aar/${project.name}-release.aar").matching {
                     include 'classes.jar'
                 }.singleFile
             }
-            into "$buildDir/outputs/"
-            String packageName = new XmlSlurper().parse(file('src/main/AndroidManifest.xml')).@package.text()
+            into "$buildDirectory/outputs/"
+
+            // Directly use the namespace as a string
+            String packageName = android.namespace
             rename "classes.jar", "${packageName}.jar"
         }
     }
@@ -62,17 +65,16 @@ tasks.register("deployToLocalSolar2DRepo", Tar) {
     compression = Compression.GZIP
     archiveFileName = "data.tgz"
     def rootS2DP
-    if(System.env.APP_DATA) {
+    if (System.env.APP_DATA) {
         rootS2DP = System.env.APP_DATA
     } else {
         rootS2DP = System.env.HOME
     }
-
     def dst = file("$rootS2DP/Solar2DPlugins/$providerId/$packageName/android")
     destinationDirectory = dst
 
     into("/") {
-        from("$buildDir/outputs/aar")
+        from("$buildDirectory/outputs/aar")
         include("${project.name}-release.aar")
     }
     doLast {

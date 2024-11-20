@@ -2,7 +2,7 @@
 
 # Configuration
 plugin="admob"
-version="39"
+version="v45"
 moveToOld=false
 
 # Step 1: Rename plugin-debug.aar to plugin-debug.zip

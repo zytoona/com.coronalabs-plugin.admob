@@ -402,7 +402,7 @@ AdMobPlugin::init(lua_State *L)
 	}
 	
 	// log plugin version to device log
-	NSLog(@"%s: %s (SDK: %@)", PLUGIN_NAME, PLUGIN_VERSION, GADMobileAds.sharedInstance.sdkVersion);
+    NSLog(@"%s: %s (SDK: %@)", PLUGIN_NAME, PLUGIN_VERSION, @"11.8.0");
 	
 	// save values for future use
 	admobObjects[TESTMODE_KEY] = @(testMode);
@@ -470,6 +470,8 @@ AdMobPlugin::load(lua_State *L)
 	const char *adType = NULL;
 	const char *adUnitId = NULL;
 	bool childSafe = false;
+    //BY-ME Zytoona.AEZ
+    bool childSet = false;
 	bool designedForFamilies = false;
 	bool localTestMode = false;
 	bool localTestModeIsSet = false;
@@ -503,6 +505,8 @@ AdMobPlugin::load(lua_State *L)
 			else if (UTF8IsEqual(key, "childSafe")) {
 				if (lua_type(L, -1) == LUA_TBOOLEAN) {
 					childSafe = lua_toboolean(L, -1);
+                    //BY-ME Zytoona.AEZ
+                    childSet = true;
 				}
 				else {
 					logMsg(L, ERROR_MSG, MsgFormat(@"options.childSafe (boolean) expected, got %s", luaL_typename(L, -1)));
@@ -615,7 +619,10 @@ AdMobPlugin::load(lua_State *L)
 	GADRequest *request = [GADRequest request];
 	
 	// set child safe flag
-	[GADMobileAds.sharedInstance.requestConfiguration tagForChildDirectedTreatment:childSafe];
+    //BY-ME Zytoona.AEZ
+    if(childSet){
+        [GADMobileAds.sharedInstance.requestConfiguration tagForChildDirectedTreatment: childSafe];
+    }
 	
 	if(maxAdRaiting) {
 		[GADMobileAds.sharedInstance.requestConfiguration setMaxAdContentRating:maxAdRaiting];

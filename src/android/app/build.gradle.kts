@@ -43,8 +43,10 @@ val coronaSrcDir = project.findProperty("coronaSrcDir") as? String
         }
 val coronaBuiltFromSource = file("CMakeLists.txt").exists() && file("../sdk").exists()
 
-val windows = System.getProperty("os.name").toLowerCase().contains("windows")
-val linux = System.getProperty("os.name").toLowerCase().contains("linux")
+val buildDirectory = layout.buildDirectory.asFile.get()
+
+val windows = System.getProperty("os.name").lowercase().contains("windows")
+val linux = System.getProperty("os.name").lowercase().contains("linux")
 val shortOsName = if (windows) "win" else if (linux) "linux" else "mac"
 
 val nativeDir = if (windows) {
@@ -57,7 +59,7 @@ val nativeDir = if (windows) {
     resourceDir ?: "${System.getenv("HOME")}/Library/Application Support/Corona/Native/"
 }
 
-val coronaPlugins = file("$buildDir/corona-plugins")
+val coronaPlugins = file("$buildDirectory/corona-plugins")
 val luaCmd = "$nativeDir/Corona/$shortOsName/bin/lua"
 val isSimulatorBuild = coronaTmpDir != null
 
@@ -81,17 +83,17 @@ val buildToolsDir = "$projectDir/buildTools".takeIf { file(it).exists() }
             checkCoronaNativeInstallation()
             copy {
                 from(zipTree("$nativeDir/Corona/android/resource/android-template.zip"))
-                into("$buildDir/intermediates/corona-build-tools")
+                into("$buildDirectory/intermediates/corona-build-tools")
             }
-            "$buildDir/intermediates/corona-build-tools/template/app/buildTools"
+            "$buildDirectory/intermediates/corona-build-tools/template/app/buildTools"
         }()
 
-val generatedPluginsOutput = "$buildDir/generated/corona_plugins"
+val generatedPluginsOutput = "$buildDirectory/generated/corona_plugins"
 val generatedPluginAssetsDir = "$generatedPluginsOutput/assets"
 val generatedPluginNativeLibsDir = "$generatedPluginsOutput/native"
 val generatedBuildIdPath = "$generatedPluginsOutput/build"
 val generatedPluginMegaJar = "$generatedPluginsOutput/plugins.jar"
-val generatedMainIconsAndBannersDir = "$buildDir/generated/corona_icons"
+val generatedMainIconsAndBannersDir = "$buildDirectory/generated/corona_icons"
 
 val parsedBuildProperties: JsonObject = run {
     coronaTmpDir?.let { srcDir ->
@@ -126,9 +128,9 @@ val parsedBuildProperties: JsonObject = run {
         isIgnoreExitValue = true
     }
     if (execResult.exitValue != 0) {
-        throw InvalidUserDataException("Build.settings file could not be parsed: ${output.toString().replace(luaCmd, "")}")
+        throw InvalidUserDataException("Build.settings file could not be parsed: ${output.toString(charset("UTF-8")).replace(luaCmd, "")}")
     }
-    val parsedBuildSettingsFile = Parser.default().parse(StringBuilder(output.toString())) as? JsonObject
+    val parsedBuildSettingsFile = Parser.default().parse(StringBuilder(output.toString(charset("UTF-8")))) as? JsonObject
     return@run JsonObject(mapOf("buildSettings" to parsedBuildSettingsFile, "packageName" to coronaAppPackage, "targetedAppStore" to coronaTargetStore))
 }
 
@@ -193,6 +195,7 @@ if (configureCoronaPlugins == "YES") {
 //</editor-fold>
 
 android {
+    namespace = coronaAppPackage
     lintOptions {
         isCheckReleaseBuilds = true
     }
@@ -289,7 +292,7 @@ android {
 
 //<editor-fold desc="Packaging Corona App" defaultstate="collapsed">
 val apkFilesSet = mutableSetOf<String>()
-file("$buildDir/intermediates/corona_manifest_gen/CopyToApk.txt").takeIf { it.exists() }?.readLines()?.forEach {
+file("$buildDirectory/intermediates/corona_manifest_gen/CopyToApk.txt").takeIf { it.exists() }?.readLines()?.forEach {
     apkFilesSet.add(it.trim())
 }
 if (!isSimulatorBuild) {
@@ -298,7 +301,7 @@ if (!isSimulatorBuild) {
     }
 }
 if (apkFilesSet.isNotEmpty()) {
-    val generatedApkFiles = "$buildDir/generated/apkFiles"
+    val generatedApkFiles = "$buildDirectory/generated/apkFiles"
     val coronaCopyApkFiles = tasks.create<Copy>("coronaCopyApkFiles") {
         description = "Creates new resource directory with raw APK files"
         into(generatedApkFiles)
@@ -396,12 +399,16 @@ fun coronaAssetsCopySpec(spec: CopySpec) {
 }
 
 android.applicationVariants.all {
-    val baseName = this.baseName.toLowerCase()
-    val isRelease = (baseName == "release")
-    val generatedAssetsDir = "$buildDir/generated/corona_assets/$baseName"
-    val compiledLuaArchive = "$buildDir/intermediates/compiled_lua_archive/$baseName/resource.car"
+    val baseName = this.baseName.lowercase()
+    val baseNameCapitalized = baseName.replaceFirstChar(Char::titlecase)
 
-    val compileLuaTask = tasks.create("compileLua${baseName.capitalize()}") {
+    val isRelease = (baseName == "release")
+    val generatedAssetsDir = "$buildDirectory/generated/corona_assets/$baseName"
+    val compiledLuaArchive = "$buildDirectory/intermediates/compiled_lua_archive/$baseName/resource.car"
+    // fix assets not been merge when lua file changed
+    val luaArchiveInMergedAssets = "$buildDirectory/intermediates/assets/$baseName/resource.car"
+
+    val compileLuaTask = tasks.create("compileLua$baseNameCapitalized") {
         description = "If required, compiles Lua and archives it into resource.car"
         val luac = "$nativeDir/Corona/$shortOsName/bin/luac"
 
@@ -417,7 +424,7 @@ android.applicationVariants.all {
         outputs.file(compiledLuaArchive)
         doLast {
             val rootFile = file(coronaSrcDir)
-            val compiledDir = "$buildDir/intermediates/compiled_lua/$baseName"
+            val compiledDir = "$buildDirectory/intermediates/compiled_lua/$baseName"
             delete(compiledDir)
             mkdir(compiledDir)
             val luaFiles = if (isSimulatorBuild) {
@@ -473,8 +480,8 @@ android.applicationVariants.all {
                     coronaBuild = "$coronaBuild",
                 }
             """.trimIndent()
-            val metadataConfig = file("$buildDir/tmp/config.$baseName.lua")
-            val metadataCompiled = file("$buildDir/tmp/config.$baseName.lu")
+            val metadataConfig = file("$buildDirectory/tmp/config.$baseName.lua")
+            val metadataCompiled = file("$buildDirectory/tmp/config.$baseName.lu")
             mkdir(metadataConfig.parent)
             metadataConfig.writeText(metadataLuaStr)
             val configEntries = outputsList.filter { file(it).name == "config.lu" } + metadataConfig
@@ -489,6 +496,8 @@ android.applicationVariants.all {
             }
             delete(metadataConfig)
             val toArchive = outputsList.filter { file(it).name != "config.lu" } + "config.lu"
+            // Make sure it's not appended to an old file
+            delete(compiledLuaArchive)
             mkdir(file(compiledLuaArchive).parent)
             exec {
                 workingDir = file(compiledDir)
@@ -498,7 +507,7 @@ android.applicationVariants.all {
         }
     }
 
-    val taskCopyResources = tasks.create<Copy>("packageCoronaApp${baseName.capitalize()}") {
+    val taskCopyResources = tasks.create<Copy>("packageCoronaApp$baseNameCapitalized") {
         description = "Copies all resources and compiled Lua to the project"
 
         dependsOn(compileLuaTask)
@@ -516,9 +525,9 @@ android.applicationVariants.all {
 
         doFirst {
             delete(generatedAssetsDir)
+            delete(luaArchiveInMergedAssets)
             mkdir(generatedAssetsDir)
-        }
-        doFirst {
+
             if (!file(coronaSrcDir).isDirectory) {
                 throw InvalidUserDataException("Unable to find Solar2D project (for example platform/test/assets2/main.lua)!")
             }
@@ -529,6 +538,8 @@ android.applicationVariants.all {
         dependsOn(taskCopyResources)
     }
     android.sourceSets[name].assets.srcDirs(generatedAssetsDir)
+    tasks.findByName("lintVitalAnalyze${baseNameCapitalized}")?.dependsOn(taskCopyResources)
+    tasks.findByName("generate${baseNameCapitalized}LintVitalReportModel")?.dependsOn(taskCopyResources)
 }
 
 fun downloadAndProcessCoronaPlugins(reDownloadPlugins: Boolean = true) {
@@ -564,7 +575,7 @@ fun downloadAndProcessCoronaPlugins(reDownloadPlugins: Boolean = true) {
                 "pluginPlatform" to androidDestPluginPlatform,
                 "destinationDirectory" to coronaPlugins.absolutePath
         )).toJsonString()
-        val builderInput = file("$buildDir/tmp/builderInput.json")
+        val builderInput = file("$buildDirectory/tmp/builderInput.json")
         builderInput.parentFile.mkdirs()
         builderInput.writeText(buildParams)
         val builderOutput = ByteArrayOutputStream()
@@ -661,7 +672,7 @@ fun downloadAndProcessCoronaPlugins(reDownloadPlugins: Boolean = true) {
     // Run `convert_metadata.lua` which collects plugin metadata into single file
     logger.lifecycle("Collecting plugin metadata")
     run {
-        file("$buildDir/intermediates").mkdirs()
+        file("$buildDirectory/intermediates").mkdirs()
         val metadataFiles = fileTree(coronaPlugins) {
             include("*/metadata.lua")
             pluginDisabledMetadata.forEach {
@@ -674,7 +685,7 @@ fun downloadAndProcessCoronaPlugins(reDownloadPlugins: Boolean = true) {
                     , "package.path='$nativeDir/Corona/shared/resource/?.lua;'..package.path"
                     , *luaVerbosityPlug
                     , "$buildToolsDir/convert_metadata.lua"
-                    , "$buildDir/intermediates/plugins_metadata.json"
+                    , "$buildDirectory/intermediates/plugins_metadata.json"
                     , *metadataFiles.toTypedArray()
             )
         }
@@ -687,12 +698,12 @@ fun downloadAndProcessCoronaPlugins(reDownloadPlugins: Boolean = true) {
         val inputSettingsFile = if (buildPropsFile.exists()) {
             buildPropsFile
         } else {
-            val buildPropsOut = file("$buildDir/intermediates/corona.build.props")
+            val buildPropsOut = file("$buildDirectory/intermediates/corona.build.props")
             buildPropsOut.writeText(parsedBuildProperties.toJsonString())
             buildPropsOut
         }
 
-        val manifestGenDir = "$buildDir/intermediates/corona_manifest_gen"
+        val manifestGenDir = "$buildDirectory/intermediates/corona_manifest_gen"
         file(manifestGenDir).mkdirs()
         exec {
             commandLine(luaCmd
@@ -704,7 +715,7 @@ fun downloadAndProcessCoronaPlugins(reDownloadPlugins: Boolean = true) {
                     , /*2*/ inputSettingsFile
                     , /*3*/ coronaAppFileName ?: "Corona App"
                     , /*4*/ "$manifestGenDir/AndroidManifest.xml"
-                    , /*5*/ "$buildDir/intermediates/plugins_metadata.json"
+                    , /*5*/ "$buildDirectory/intermediates/plugins_metadata.json"
                     , /*6*/ "$buildToolsDir/strings.xml"
                     , /*7*/ "$manifestGenDir/strings.xml"
                     , /*8*/ "$manifestGenDir/CopyToApk.txt"
@@ -754,7 +765,7 @@ fun downloadAndProcessCoronaPlugins(reDownloadPlugins: Boolean = true) {
 
     logger.lifecycle("Collecting legacy jar libraries")
     run {
-        val megaJarExtracted = "$buildDir/intermediates/corona-mega-jar"
+        val megaJarExtracted = "$buildDirectory/intermediates/corona-mega-jar"
         delete(megaJarExtracted)
         delete(generatedPluginMegaJar)
         fileTree(coronaPlugins) {
@@ -798,9 +809,8 @@ tasks.register("processPluginsNoDownload") {
 //<editor-fold desc="Core Development helpers" defaultstate="collapsed">
 
 tasks.register<Zip>("exportCoronaAppTemplate") {
-    if (coronaBuiltFromSource) group = "Corona-dev"
     enabled = coronaBuiltFromSource
-    destinationDirectory.set(file("$buildDir/outputs"))
+    destinationDirectory.set(file("$buildDirectory/outputs"))
     archiveFileName.set("android-template.zip")
     from(rootDir) {
         include("build.gradle.kts", "settings.gradle.kts", "gradle.properties")
@@ -874,7 +884,7 @@ tasks.register<Copy>("installAppTemplateToSim") {
     if (coronaBuiltFromSource) group = "Corona-dev"
     enabled = coronaBuiltFromSource
     dependsOn("exportCoronaAppTemplate")
-    from("$buildDir/outputs") {
+    from("$buildDirectory/outputs") {
         include("android-template.zip")
     }
     into("$coronaNativeOutputDir/android/resource")
@@ -885,7 +895,7 @@ tasks.register<Copy>("installAppTemplateAndAARToSim") {
     enabled = coronaBuiltFromSource
     dependsOn("installAppTemplateToSim")
     dependsOn(":Corona:assembleRelease")
-    from("${findProject(":Corona")?.buildDir}/outputs/aar/") {
+    from("${findProject(":Corona")?.layout?.buildDirectory?.asFile?.get()}/outputs/aar/") {
         include("Corona-release.aar")
         rename("Corona-release.aar", "Corona.aar")
     }
@@ -897,7 +907,7 @@ fun copyWithAppFilename(dest: String, appName: String?) {
     delete("$dest/$coronaAppFileName.aab")
     var hasODR = false
     parsedBuildProperties.lookup<JsonArray<JsonObject>>("buildSettings.android.onDemandResources").firstOrNull()?.forEach {
-        it["resource"].let { res ->
+        it["resource"].let {
             hasODR = true
         }
     }
@@ -914,7 +924,7 @@ fun copyWithAppFilename(dest: String, appName: String?) {
                     exclude("*unsigned*")
                 }
             }
-            copyTask.from("$buildDir/outputs/bundle/$name") {
+            copyTask.from("$buildDirectory/outputs/bundle/$name") {
                 include("*.aab")
             }
         }
@@ -1108,7 +1118,7 @@ tasks.create<Copy>("copySplashScreen") {
 
 tasks.register<Zip>("createExpansionFile") {
     enabled = isExpansionFileRequired
-    destinationDirectory.set(file("$buildDir/outputs"))
+    destinationDirectory.set(file("$buildDirectory/outputs"))
     archiveFileName.set(coronaExpansionFileName)
 
     from(coronaSrcDir) {

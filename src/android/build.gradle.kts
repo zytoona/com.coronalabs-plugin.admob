@@ -16,7 +16,7 @@ allprojects {
         mavenCentral()  // Maven Central repository
 
         // maven(url = "https:// some custom repo")
-        val nativeDir = if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+        val nativeDir = if (System.getProperty("os.name").lowercase().contains("windows")) {
             System.getenv("CORONA_ROOT")
         } else {
             "${System.getenv("HOME")}/Library/Application Support/Corona/Native/"
@@ -28,5 +28,5 @@ allprojects {
 }
 
 tasks.register<Delete>("clean") {
-    delete(rootProject.buildDir)
+    delete(rootProject.layout.buildDirectory.asFile.get())
 }
