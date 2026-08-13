@@ -674,8 +674,9 @@ AdMobPlugin::load(lua_State *L)
 		for(int i = 0; i < CC_MD5_DIGEST_LENGTH; i++) {
 			[admobVendorDeviceID appendFormat:@"%02x", digest[i]];
 		}
-		
-        GADMobileAds.sharedInstance.requestConfiguration.testDeviceIdentifiers = @[GADSimulatorID, admobDeviceID, admobVendorDeviceID];
+        //TODO(AEZ): upgrade to version 12.
+//        GADMobileAds.sharedInstance.requestConfiguration.testDeviceIdentifiers = @[kGADSimulatorID, admobDeviceID, admobVendorDeviceID];
+        GADMobileAds.sharedInstance.requestConfiguration.testDeviceIdentifiers = @[admobDeviceID, admobVendorDeviceID];
 		NSLog(@"%s: Test mode active for device '%@'", PLUGIN_NAME, GADMobileAds.sharedInstance.requestConfiguration.testDeviceIdentifiers);
 	}
 	
