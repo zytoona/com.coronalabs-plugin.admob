@@ -38,10 +38,12 @@ import com.google.android.gms.ads.AdError;
 import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdSize;
+import com.google.android.gms.ads.AdValue;
 import com.google.android.gms.ads.AdView;
 import com.google.android.gms.ads.FullScreenContentCallback;
 import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.OnPaidEventListener;
 import com.google.android.gms.ads.OnUserEarnedRewardListener;
 import com.google.android.gms.ads.RequestConfiguration;
 import com.google.android.gms.ads.appopen.AppOpenAd;
@@ -125,6 +127,7 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
     private static final String PHASE_CLOSED = "closed";
     private static final String PHASE_CLICKED = "clicked";
     private static final String PHASE_REWARD = "reward";
+    private static final String PHASE_REVENUE = "revenue";
 
     // reward keys
     private static final String REWARD_ITEM = "rewardItem";
@@ -142,6 +145,11 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
     private static final String DATA_ERRORMSG_KEY = "errorMsg";
     private static final String DATA_ERRORCODE_KEY = "errorCode";
     private static final String DATA_ADUNIT_ID_KEY = "adUnitId";
+
+    // ILRD (Impression-Level Revenue Data) keys
+    private static final String DATA_ADVALUE_KEY = "adValue";
+    private static final String DATA_CURRENCYCODE_KEY = "currencyCode";
+    private static final String DATA_PRECISION_KEY = "precision";
 
     // message constants
     private static final String CORONA_TAG = "Corona";
@@ -175,6 +183,28 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
             }
         }
         v.invalidate();
+    }
+
+    // ILRD: Helper to dispatch a paid event for impression-level ad revenue
+    // Converts micros to standard currency units to match iOS API (e.g. 5000 micros -> "0.005")
+    private void dispatchRevenueEvent(String adType, String adUnitId, AdValue adValue) {
+        JSONObject data = new JSONObject();
+        try {
+            // Convert micros to standard currency units to match iOS behavior
+            double valueInStandardUnits = adValue.getValueMicros() / 1_000_000.0;
+            data.put(DATA_ADUNIT_ID_KEY, adUnitId);
+            data.put(DATA_ADVALUE_KEY, String.valueOf(valueInStandardUnits));
+            data.put(DATA_CURRENCYCODE_KEY, adValue.getCurrencyCode());
+            data.put(DATA_PRECISION_KEY, adValue.getPrecisionType());
+
+            Map<String, Object> coronaEvent = new HashMap<>();
+            coronaEvent.put(EVENT_PHASE_KEY, PHASE_REVENUE);
+            coronaEvent.put(EVENT_TYPE_KEY, adType);
+            coronaEvent.put(EVENT_DATA_KEY, data.toString());
+            dispatchLuaEvent(coronaEvent);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -356,18 +386,35 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
                             AdView banner = (AdView) object;
                             //noinspection ConstantConditions
                             banner.setAdListener(null);
+                            banner.setOnPaidEventListener(null);
                             banner.destroy();
                         } else if (object instanceof CoronaAdmobInterstitialLoadDelegate) {
                             CoronaAdmobInterstitialLoadDelegate interstitial = (CoronaAdmobInterstitialLoadDelegate) object;
                             if (interstitial.interstitialAd != null) {
                                 interstitial.interstitialAd.setFullScreenContentCallback(null);
+                                interstitial.interstitialAd.setOnPaidEventListener(null);
                                 interstitial.interstitialAd = null;
                             }
                         } else if (object instanceof CoronaAdmobRewardedLoadDelegate) {
                             CoronaAdmobRewardedLoadDelegate rewardedAd = (CoronaAdmobRewardedLoadDelegate) object;
                             if (rewardedAd.rewardedAd != null) {
                                 rewardedAd.rewardedAd.setFullScreenContentCallback(null);
+                                rewardedAd.rewardedAd.setOnPaidEventListener(null);
                                 rewardedAd.rewardedAd = null;
+                            }
+                        } else if (object instanceof CoronaAdmobRewardedInterstitialLoadDelegate) {
+                            CoronaAdmobRewardedInterstitialLoadDelegate rewardedInterstitialAd = (CoronaAdmobRewardedInterstitialLoadDelegate) object;
+                            if (rewardedInterstitialAd.rewardedInterstitialAd != null) {
+                                rewardedInterstitialAd.rewardedInterstitialAd.setFullScreenContentCallback(null);
+                                rewardedInterstitialAd.rewardedInterstitialAd.setOnPaidEventListener(null);
+                                rewardedInterstitialAd.rewardedInterstitialAd = null;
+                            }
+                        } else if (object instanceof CoronaAdmobAppOpenLoadDelegate) {
+                            CoronaAdmobAppOpenLoadDelegate appOpenAd = (CoronaAdmobAppOpenLoadDelegate) object;
+                            if (appOpenAd.appOpenAd != null) {
+                                appOpenAd.appOpenAd.setFullScreenContentCallback(null);
+                                appOpenAd.appOpenAd.setOnPaidEventListener(null);
+                                appOpenAd.appOpenAd = null;
                             }
                         }
                     }
@@ -937,6 +984,14 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
                                     banner.setAdListener(new CoronaAdmobBannerDelegate(banner));
                                     banner.setVisibility(View.INVISIBLE);
 
+                                    // ILRD: Set paid event listener for banner impression-level ad revenue
+                                    banner.setOnPaidEventListener(new OnPaidEventListener() {
+                                        @Override
+                                        public void onPaidEvent(@NonNull AdValue adValue) {
+                                            dispatchRevenueEvent(TYPE_BANNER, fAdUnitId, adValue);
+                                        }
+                                    });
+
                                     // set layout params
                                     FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                                             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -955,6 +1010,7 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
                                             oldBanner.setVisibility(View.INVISIBLE);
                                             //noinspection ConstantConditions
                                             oldBanner.setAdListener(null);
+                                            oldBanner.setOnPaidEventListener(null);
                                             coronaActivity.getOverlayView().removeView(oldBanner);
                                             oldBanner.destroy();
                                         }
@@ -1377,7 +1433,7 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
                                     appOpenAd.appOpenAd.show(coronaActivity);
                                     appOpenAd.appOpenAd = null;
                                 } else {
-                                    logMsg(WARNING_MSG, "Rewarded Interstitial not loaded");
+                                    logMsg(WARNING_MSG, "App Open not loaded");
                                 }
                                 break;
                             case TYPE_BANNER:
@@ -1928,16 +1984,16 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
                                     public void onConsentFormDismissed(@Nullable FormError formError) {
                                         if(formError == null){
                                             Map<String, Object> coronaEvent = new HashMap<>();
+                                            coronaEvent.put(EVENT_PHASE_KEY, PHASE_HIDDEN);
+                                            coronaEvent.put(EVENT_TYPE_KEY, TYPE_UMP);
+                                            coronaEvent.put(CoronaLuaEvent.ISERROR_KEY, false);
+                                            dispatchLuaEvent(coronaEvent);
+                                        }else{
+                                            Map<String, Object> coronaEvent = new HashMap<>();
                                             coronaEvent.put(EVENT_PHASE_KEY, PHASE_FAILED);
                                             coronaEvent.put(CoronaLuaEvent.ERRORTYPE_KEY, formError.getMessage());
                                             coronaEvent.put(EVENT_TYPE_KEY, TYPE_UMP);
                                             coronaEvent.put(CoronaLuaEvent.ISERROR_KEY, true);
-                                            dispatchLuaEvent(coronaEvent);
-                                        }else{
-                                            Map<String, Object> coronaEvent = new HashMap<>();
-                                            coronaEvent.put(EVENT_PHASE_KEY, PHASE_HIDDEN);
-                                            coronaEvent.put(EVENT_TYPE_KEY, TYPE_UMP);
-                                            coronaEvent.put(CoronaLuaEvent.ISERROR_KEY, false);
                                             dispatchLuaEvent(coronaEvent);
                                         }
 
@@ -2105,6 +2161,15 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
         @Override
         public void onAdLoaded(InterstitialAd ad) {
             interstitialAd = ad;
+
+            // ILRD: Set paid event listener for impression-level ad revenue
+            interstitialAd.setOnPaidEventListener(new OnPaidEventListener() {
+                @Override
+                public void onPaidEvent(@NonNull AdValue adValue) {
+                    dispatchRevenueEvent(TYPE_INTERSTITIAL, adUnitId, adValue);
+                }
+            });
+
             // create data
             JSONObject data = new JSONObject();
             try {
@@ -2150,6 +2215,15 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
         @Override
         public void onAdLoaded(RewardedAd ad) {
             rewardedAd = ad;
+
+            // ILRD: Set paid event listener for impression-level ad revenue
+            rewardedAd.setOnPaidEventListener(new OnPaidEventListener() {
+                @Override
+                public void onPaidEvent(@NonNull AdValue adValue) {
+                    dispatchRevenueEvent(TYPE_REWARDEDVIDEO, adUnitId, adValue);
+                }
+            });
+
             // create data
             JSONObject data = new JSONObject();
             try {
@@ -2198,6 +2272,15 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
         @Override
         public void onAdLoaded(RewardedInterstitialAd ad) {
             rewardedInterstitialAd = ad;
+
+            // ILRD: Set paid event listener for impression-level ad revenue
+            rewardedInterstitialAd.setOnPaidEventListener(new OnPaidEventListener() {
+                @Override
+                public void onPaidEvent(@NonNull AdValue adValue) {
+                    dispatchRevenueEvent(TYPE_REWARDEDINTERSTITIAL, adUnitId, adValue);
+                }
+            });
+
             // create data
             JSONObject data = new JSONObject();
             try {
@@ -2246,6 +2329,15 @@ public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
         @Override
         public void onAdLoaded(AppOpenAd ad) {
             appOpenAd = ad;
+
+            // ILRD: Set paid event listener for impression-level ad revenue
+            appOpenAd.setOnPaidEventListener(new OnPaidEventListener() {
+                @Override
+                public void onPaidEvent(@NonNull AdValue adValue) {
+                    dispatchRevenueEvent(TYPE_APPOPEN, adUnitId, adValue);
+                }
+            });
+
             // create data
             JSONObject data = new JSONObject();
             try {

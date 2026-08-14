@@ -8,11 +8,12 @@
 #import <Foundation/Foundation.h>
 
 /// Ad metadata key type.
-typedef NSString *GADAdMetadataKey NS_STRING_ENUM;
+typedef NSString *GADAdMetadataKey NS_TYPED_ENUM;
 
 @protocol GADAdMetadataDelegate;
 
 /// Protocol for ads that provide ad metadata.
+NS_SWIFT_NAME(AdMetadataProvider)
 @protocol GADAdMetadataProvider <NSObject>
 
 /// The ad's metadata. Use adMetadataDelegate to receive ad metadata change messages.
@@ -24,6 +25,7 @@ typedef NSString *GADAdMetadataKey NS_STRING_ENUM;
 @end
 
 /// Delegate protocol for receiving ad metadata change messages from a GADAdMetadataProvider.
+NS_SWIFT_NAME(AdMetadataDelegate)
 @protocol GADAdMetadataDelegate <NSObject>
 
 /// Tells the delegate that the ad's metadata changed. Called when an ad loads and when a loaded

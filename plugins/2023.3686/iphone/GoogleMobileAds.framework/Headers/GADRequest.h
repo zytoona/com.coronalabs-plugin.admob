@@ -11,14 +11,8 @@
 #import <GoogleMobileAds/GoogleMobileAdsDefines.h>
 #import <UIKit/UIKit.h>
 
-/// Deprecated gender constants.
-typedef NS_ENUM(NSInteger, GADGender) {
-  kGADGenderUnknown,  ///< Deprecated.
-  kGADGenderMale,     ///< Deprecated.
-  kGADGenderFemale    ///< Deprecated.
-};
-
 /// Specifies optional parameters for ad requests.
+NS_SWIFT_NAME(Request)
 @interface GADRequest : NSObject <NSCopying>
 
 /// Returns a default request.
@@ -43,7 +37,8 @@ typedef NS_ENUM(NSInteger, GADGender) {
 
 #pragma mark Publisher Provided
 
-/// Scene object. Used in multiscene apps to request ads of the appropriate size.
+/// Scene object. Used in multiscene apps to request ads of the appropriate size. If this is nil,
+/// uses the application's key window scene.
 @property(nonatomic, nullable, weak) UIWindowScene *scene API_AVAILABLE(ios(13.0));
 
 #pragma mark Contextual Information
@@ -59,7 +54,12 @@ typedef NS_ENUM(NSInteger, GADGender) {
 /// URL strings for non-primary web content near an ad. Promotes brand safety and allows displayed
 /// ads to have an app level rating (MA, T, PG, etc) that is more appropriate to neighboring
 /// content.
-@property(nonatomic, copy, nullable) NSArray<NSString *> *neighboringContentURLStrings;
+@property(nonatomic, copy, nullable)
+    NSArray<NSString *> *neighboringContentURLStrings NS_SWIFT_NAME(neighboringContentURLs);
+
+/// An identifier for a placement in reporting. A value set here will be set onto any ad returned by
+/// this request.
+@property(atomic, readwrite) int64_t placementID;
 
 #pragma mark Request Agent Information
 
@@ -68,5 +68,10 @@ typedef NS_ENUM(NSInteger, GADGender) {
 /// For example, a third party ad network called "CoolAds network" that is mediating requests to the
 /// Mobile Ads SDK should set this property as "CoolAds".
 @property(nonatomic, copy, nullable) NSString *requestAgent;
+
+#pragma mark Optional Targeting Information
+
+/// Key-value pairs used for custom targeting.
+@property(nonatomic, copy, nullable) NSDictionary<NSString *, id> *customTargeting;
 
 @end

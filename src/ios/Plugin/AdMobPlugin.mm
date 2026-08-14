@@ -72,6 +72,7 @@ static NSString * const PHASE_CLOSED    = @"closed";
 static NSString * const PHASE_HIDDEN    = @"hidden";
 static NSString * const PHASE_CLICKED   = @"clicked";
 static NSString * const PHASE_REWARD    = @"reward";
+static NSString * const PHASE_REVENUE   = @"revenue";
 
 // reward keys
 static NSString * const REWARD_ITEM   = @"rewardItem";
@@ -98,6 +99,11 @@ static NSString * const Y_RATIO_KEY     = @"yRatio";        // used to calculate
 static NSString * const DATA_ERRORMSG_KEY  = @"errorMsg";
 static NSString * const DATA_ERRORCODE_KEY = @"errorCode";
 static NSString * const DATA_ADUNIT_ID_KEY = @"adUnitId";
+
+// ILRD (Impression-Level Revenue Data) keys
+static NSString * const DATA_ADVALUE_KEY       = @"adValue";
+static NSString * const DATA_CURRENCYCODE_KEY  = @"currencyCode";
+static NSString * const DATA_PRECISION_KEY     = @"precision";
 
 // ----------------------------------------------------------------------------
 // plugin class and delegate definitions
@@ -136,6 +142,7 @@ static NSString * const DATA_ADUNIT_ID_KEY = @"adUnitId";
 + (NSString *)getJSONStringForAd:(NSObject *)ad error:(NSError *)error;
 + (NSString *)getJSONStringForAd:(NSObject *)ad;
 + (NSString *)getJSONStringForError:(NSError *)error;
++ (NSString *)getJSONStringForAdValue:(GADAdValue *)adValue ad:(NSObject *)ad;
 
 @end
 
@@ -711,6 +718,17 @@ AdMobPlugin::load(lua_State *L)
 			} else {
                 
                 interstitialAd.fullScreenContentDelegate = admobDelegate;
+
+                // ILRD: Set paid event handler for impression-level ad revenue
+                interstitialAd.paidEventHandler = ^(GADAdValue *_Nonnull adValue) {
+                    NSDictionary *coronaEvent = @{
+                        @(CoronaEventPhaseKey()) : PHASE_REVENUE,
+                        @(CoronaEventTypeKey()) : @(TYPE_INTERSTITIAL),
+                        CORONA_EVENT_DATA_KEY : [CoronaAdMobDelegate getJSONStringForAdValue:adValue ad:interstitialAd]
+                    };
+                    [admobDelegate dispatchLuaEvent:coronaEvent];
+                };
+
 				adInstance.adInstance = interstitialAd;
 				// send Corona Lua event
 				NSDictionary *coronaEvent = @{
@@ -749,6 +767,17 @@ AdMobPlugin::load(lua_State *L)
 			} else {
                 
                 rewardedAd.fullScreenContentDelegate = admobDelegate;
+
+                // ILRD: Set paid event handler for impression-level ad revenue
+                rewardedAd.paidEventHandler = ^(GADAdValue *_Nonnull adValue) {
+                    NSDictionary *coronaEvent = @{
+                        @(CoronaEventPhaseKey()) : PHASE_REVENUE,
+                        @(CoronaEventTypeKey()) : @(TYPE_REWARDEDVIDEO),
+                        CORONA_EVENT_DATA_KEY : [CoronaAdMobDelegate getJSONStringForAdValue:adValue ad:rewardedAd]
+                    };
+                    [admobDelegate dispatchLuaEvent:coronaEvent];
+                };
+
 				adInstance.adInstance = rewardedAd;
 				// send Corona Lua event
 				NSDictionary *coronaEvent = @{
@@ -790,6 +819,17 @@ AdMobPlugin::load(lua_State *L)
                           adInstance.isLoaded = false;
                       } else {
                           rewardedInterstitialAd.fullScreenContentDelegate = admobDelegate;
+
+                          // ILRD: Set paid event handler for impression-level ad revenue
+                          rewardedInterstitialAd.paidEventHandler = ^(GADAdValue *_Nonnull adValue) {
+                              NSDictionary *coronaEvent = @{
+                                  @(CoronaEventPhaseKey()) : PHASE_REVENUE,
+                                  @(CoronaEventTypeKey()) : @(TYPE_REWARDEDINTERSTITIAL),
+                                  CORONA_EVENT_DATA_KEY : [CoronaAdMobDelegate getJSONStringForAdValue:adValue ad:rewardedInterstitialAd]
+                              };
+                              [admobDelegate dispatchLuaEvent:coronaEvent];
+                          };
+
                           adInstance.adInstance = rewardedInterstitialAd;
                           // send Corona Lua event
                           NSDictionary *coronaEvent = @{
@@ -830,6 +870,17 @@ AdMobPlugin::load(lua_State *L)
             [banner setDelegate:admobDelegate];
             [banner setAdUnitID:@(adUnitId)];
             [banner setRootViewController:library.coronaViewController];
+
+            // ILRD: Set paid event handler for impression-level ad revenue on banner
+            banner.paidEventHandler = ^(GADAdValue *_Nonnull adValue) {
+                NSDictionary *coronaEvent = @{
+                    @(CoronaEventPhaseKey()) : PHASE_REVENUE,
+                    @(CoronaEventTypeKey()) : @(TYPE_BANNER),
+                    CORONA_EVENT_DATA_KEY : [CoronaAdMobDelegate getJSONStringForAdValue:adValue ad:banner]
+                };
+                [admobDelegate dispatchLuaEvent:coronaEvent];
+            };
+
             // create ad instance object (stores additional info about the ad not available in GADBannerView)
             adInstance = [[CoronaAdMobAdInstance alloc] initWithAd:banner adType:@(adType)];
             adInstance.viewController = library.coronaViewController;
@@ -866,6 +917,17 @@ AdMobPlugin::load(lua_State *L)
                
              }else{
                  appOpenAd.fullScreenContentDelegate = admobDelegate;
+
+                 // ILRD: Set paid event handler for impression-level ad revenue
+                 appOpenAd.paidEventHandler = ^(GADAdValue *_Nonnull adValue) {
+                     NSDictionary *coronaEvent = @{
+                         @(CoronaEventPhaseKey()) : PHASE_REVENUE,
+                         @(CoronaEventTypeKey()) : @(TYPE_APPOPEN),
+                         CORONA_EVENT_DATA_KEY : [CoronaAdMobDelegate getJSONStringForAdValue:adValue ad:appOpenAd]
+                     };
+                     [admobDelegate dispatchLuaEvent:coronaEvent];
+                 };
+
                  adInstance.adInstance = appOpenAd;
                  // send Corona Lua event
                  NSDictionary *coronaEvent = @{
@@ -1719,6 +1781,28 @@ AdMobPlugin::getConsentFormStatus(lua_State *L)
     return [CoronaAdMobDelegate getJSONStringForAd:nil reward:nil error:error];
 }
 
+// ILRD: Create JSON string from GADAdValue (impression-level ad revenue data)
++ (NSString *)getJSONStringForAdValue:(GADAdValue *)adValue ad:(NSObject *)ad
+{
+    NSMutableDictionary *dataDictionary = [NSMutableDictionary new];
+
+    if (adValue != nil) {
+        dataDictionary[DATA_ADVALUE_KEY] = [adValue.value stringValue];
+        dataDictionary[DATA_CURRENCYCODE_KEY] = adValue.currencyCode;
+        dataDictionary[DATA_PRECISION_KEY] = @(adValue.precision);
+    }
+
+    if (ad != nil) {
+        NSString *adUnitId = [CoronaAdMobDelegate placementForAd:ad];
+        if (adUnitId != nil) {
+            dataDictionary[DATA_ADUNIT_ID_KEY] = adUnitId;
+        }
+    }
+
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dataDictionary options:0 error:nil];
+    return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+}
+
 // dispatch a new Lua event
 - (void)dispatchLuaEvent:(NSDictionary *)dict
 {
@@ -1767,6 +1851,8 @@ AdMobPlugin::getConsentFormStatus(lua_State *L)
 		return  @(TYPE_INTERSTITIAL);
 	}else if ([ad isKindOfClass:[GADRewardedInterstitialAd class]]) {
         return  @(TYPE_REWARDEDINTERSTITIAL);
+    }else if ([ad isKindOfClass:[GADAppOpenAd class]]) {
+        return  @(TYPE_APPOPEN);
     }
 	return @"UNKNOWN";
 }
@@ -1926,17 +2012,30 @@ AdMobPlugin::getConsentFormStatus(lua_State *L)
 		if (UTF8IsEqual([self.adType UTF8String], TYPE_BANNER)) {
 			GADBannerView *banner = (GADBannerView *)self.adInstance;
 			[banner setDelegate:nil];
+            banner.paidEventHandler = nil;
 			[banner removeFromSuperview];
 		}
 		else if (UTF8IsEqual([self.adType UTF8String], TYPE_INTERSTITIAL)) {
 			GADInterstitialAd *interstitial = (GADInterstitialAd *)self.adInstance;
 			[interstitial setFullScreenContentDelegate:nil];
+            interstitial.paidEventHandler = nil;
 		}
 		else if(UTF8IsEqual([self.adType UTF8String], TYPE_REWARDEDVIDEO)) {
 			GADRewardedAd *rewarded = (GADRewardedAd *)self.adInstance;
 			[rewarded setFullScreenContentDelegate:nil];
+            rewarded.paidEventHandler = nil;
 		}
-		
+        else if(UTF8IsEqual([self.adType UTF8String], TYPE_REWARDEDINTERSTITIAL)) {
+            GADRewardedInterstitialAd *rewardedInterstitial = (GADRewardedInterstitialAd *)self.adInstance;
+            [rewardedInterstitial setFullScreenContentDelegate:nil];
+            rewardedInterstitial.paidEventHandler = nil;
+        }
+        else if(UTF8IsEqual([self.adType UTF8String], TYPE_APPOPEN)) {
+            GADAppOpenAd *appOpen = (GADAppOpenAd *)self.adInstance;
+            [appOpen setFullScreenContentDelegate:nil];
+            appOpen.paidEventHandler = nil;
+        }
+
 		self.adInstance = nil;
 	}
 }

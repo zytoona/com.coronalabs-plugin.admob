@@ -12,6 +12,7 @@
 
 /// Specifies optional ad request targeting parameters that are provided by the publisher and are
 /// forwarded to custom events for purposes of populating an ad request to a 3rd party ad network.
+NS_SWIFT_NAME(CustomEventRequest)
 @interface GADCustomEventRequest : NSObject
 
 /// Keywords set in GADRequest. Returns nil if no keywords are set.
@@ -26,29 +27,5 @@
 
 /// Indicates whether the testing property has been set in GADRequest.
 @property(nonatomic, readonly, assign) BOOL isTesting;
-
-#pragma mark - Deprecated
-
-/// Deprecated and unsupported. Always NO.
-@property(nonatomic, readonly, assign)
-    BOOL userHasLocation GAD_DEPRECATED_MSG_ATTRIBUTE("Deprecated and unsupported. Always NO.");
-
-/// Deprecated and unsupported. Always 0.
-@property(nonatomic, readonly, assign)
-    CGFloat userLatitude GAD_DEPRECATED_MSG_ATTRIBUTE("Deprecated and unsupported. Always 0.");
-
-/// Deprecated and unsupported. Always 0.
-@property(nonatomic, readonly, assign)
-    CGFloat userLongitude GAD_DEPRECATED_MSG_ATTRIBUTE("Deprecated and unsupported. Always 0.");
-
-/// Deprecated and unsupported. Always 0.
-@property(nonatomic, readonly, assign)
-    CGFloat userLocationAccuracyInMeters GAD_DEPRECATED_MSG_ATTRIBUTE(
-        "Deprecated and unsupported. Always 0.");
-
-/// Deprecated and unsupported. Always nil.
-@property(nonatomic, readonly, copy, nullable)
-    NSString *userLocationDescription GAD_DEPRECATED_MSG_ATTRIBUTE(
-        "Deprecated and unsupported. Always nil.");
 
 @end

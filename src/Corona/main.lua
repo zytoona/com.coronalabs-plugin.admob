@@ -88,20 +88,20 @@ local oldOrientation
 if platformName == "Android" then
   appId = "ca-app-pub-7897780601981890~1957125968"
   adUnits = {
-    interstitial="ca-app-pub-7897780601981890/4910592366",
-    rewardedVideo="ca-app-pub-7897780601981890/6354495960",
-    banner="ca-app-pub-3940256099942544/6300978111",
-    appOpen="ca-app-pub-3940256099942544/3419835294",
-    rewardedInterstitial="ca-app-pub-3940256099942544/5354046379"
-  }
-elseif platformName == "iPhone OS" then
-  appId = "ca-app-pub-7897780601981890~3573459965"
-  adUnits = {
     interstitial="ca-app-pub-3940256099942544/1033173712",
     rewardedVideo="ca-app-pub-3940256099942544/5224354917",
     banner="ca-app-pub-3940256099942544/6300978111",
     appOpen="ca-app-pub-3940256099942544/3419835294",
     rewardedInterstitial="ca-app-pub-3940256099942544/5354046379"
+  }
+elseif platformName == "iPhone OS" then
+  appId = "ca-app-pub-3940256099942544~1458002511"
+  adUnits = {
+    interstitial="ca-app-pub-3940256099942544/4411468910",
+    rewardedVideo="ca-app-pub-3940256099942544/1712485313",
+    banner="ca-app-pub-3940256099942544/2435281174",
+    appOpen="ca-app-pub-3940256099942544/5575463023",
+    rewardedInterstitial="ca-app-pub-3940256099942544/6978759866"
   }
 else
   print "Unsupported platform"
