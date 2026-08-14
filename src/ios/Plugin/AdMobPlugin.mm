@@ -34,7 +34,7 @@
 // ----------------------------------------------------------------------------
 
 #define PLUGIN_NAME        "plugin.admob"
-#define PLUGIN_VERSION     "1.5.0"
+#define PLUGIN_VERSION     "v49-min"
 
 static const char EVENT_NAME[]    = "adsRequest";
 static const char PROVIDER_NAME[] = "admob";

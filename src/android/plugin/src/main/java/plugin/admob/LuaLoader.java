@@ -96,7 +96,7 @@ import static java.lang.Math.ceil;
 @SuppressWarnings({"unused", "RedundantSuppression"})
 public class LuaLoader implements JavaFunction, CoronaRuntimeListener {
     private static final String PLUGIN_NAME = "plugin.admob";
-    private static final String PLUGIN_VERSION = "4.5.0";
+    private static final String PLUGIN_VERSION = "v49-min";
     private static final String PLUGIN_SDK_VERSION = MobileAds.getVersion().toString();
 
     private static final String EVENT_NAME = "adsRequest";
